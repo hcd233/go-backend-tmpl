@@ -25,7 +25,7 @@ const docTemplate = `{
     "paths": {
         "/": {
             "get": {
-                "description": "健康检查",
+                "description": "Health check endpoint",
                 "consumes": [
                     "application/json"
                 ],
@@ -33,9 +33,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "ping"
+                    "health"
                 ],
-                "summary": "健康检查",
+                "summary": "Ping",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -48,7 +48,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/protocol.PingResponse"
+                                            "type": "string"
                                         },
                                         "error": {
                                             "type": "object"
@@ -63,7 +63,7 @@ const docTemplate = `{
         },
         "/v1/oauth2/{provider}/callback": {
             "get": {
-                "description": "OAuth2回调请求,验证code和state",
+                "description": "处理OAuth2授权回调",
                 "consumes": [
                     "application/json"
                 ],
@@ -75,6 +75,13 @@ const docTemplate = `{
                 ],
                 "summary": "OAuth2回调",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "OAuth2提供商 (github/google)",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "授权码",
@@ -102,7 +109,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/protocol.CallbackResponse"
+                                            "$ref": "#/definitions/auth.CallbackResponse"
                                         },
                                         "error": {
                                             "type": "object"
@@ -135,27 +142,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/protocol.HTTPResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "allOf": [
                                 {
@@ -201,7 +187,7 @@ const docTemplate = `{
         },
         "/v1/oauth2/{provider}/login": {
             "get": {
-                "description": "OAuth2登录请求,返回重定向URL",
+                "description": "获取OAuth2授权URL",
                 "consumes": [
                     "application/json"
                 ],
@@ -212,6 +198,15 @@ const docTemplate = `{
                     "oauth2"
                 ],
                 "summary": "OAuth2登录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "OAuth2提供商 (github/google)",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -224,7 +219,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/protocol.LoginResponse"
+                                            "$ref": "#/definitions/auth.LoginResponse"
                                         },
                                         "error": {
                                             "type": "object"
@@ -236,48 +231,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/protocol.HTTPResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/protocol.HTTPResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "allOf": [
                                 {
@@ -323,12 +276,7 @@ const docTemplate = `{
         },
         "/v1/token/refresh": {
             "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "刷新令牌",
+                "description": "使用refresh token获取新的access token",
                 "consumes": [
                     "application/json"
                 ],
@@ -338,10 +286,10 @@ const docTemplate = `{
                 "tags": [
                     "token"
                 ],
-                "summary": "刷新令牌",
+                "summary": "刷新访问令牌",
                 "parameters": [
                     {
-                        "description": "刷新令牌请求体",
+                        "description": "刷新令牌请求",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -366,6 +314,48 @@ const docTemplate = `{
                                         },
                                         "error": {
                                             "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/protocol.HTTPResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/protocol.HTTPResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "type": "string"
                                         }
                                     }
                                 }
@@ -437,7 +427,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/protocol.UpdateUserInfoResponse"
+                                            "$ref": "#/definitions/user.UpdateUserInfoResponse"
                                         },
                                         "error": {
                                             "type": "object"
@@ -564,7 +554,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/protocol.GetCurUserInfoResponse"
+                                            "$ref": "#/definitions/user.CurUserInfoResponse"
                                         },
                                         "error": {
                                             "type": "object"
@@ -682,6 +672,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "description": "用户ID",
                         "name": "userID",
                         "in": "path",
                         "required": true
@@ -699,7 +690,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/protocol.GetUserInfoResponse"
+                                            "$ref": "#/definitions/user.UserInfoResponse"
                                         },
                                         "error": {
                                             "type": "object"
@@ -798,7 +789,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "protocol.CallbackResponse": {
+        "auth.CallbackResponse": {
             "type": "object",
             "properties": {
                 "accessToken": {
@@ -809,45 +800,11 @@ const docTemplate = `{
                 }
             }
         },
-        "protocol.CurUser": {
+        "auth.LoginResponse": {
             "type": "object",
             "properties": {
-                "avatar": {
+                "redirectURL": {
                     "type": "string"
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "lastLogin": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "permission": {
-                    "type": "string"
-                },
-                "userID": {
-                    "type": "integer"
-                }
-            }
-        },
-        "protocol.GetCurUserInfoResponse": {
-            "type": "object",
-            "properties": {
-                "user": {
-                    "$ref": "#/definitions/protocol.CurUser"
-                }
-            }
-        },
-        "protocol.GetUserInfoResponse": {
-            "type": "object",
-            "properties": {
-                "user": {
-                    "$ref": "#/definitions/protocol.User"
                 }
             }
         },
@@ -856,22 +813,6 @@ const docTemplate = `{
             "properties": {
                 "data": {},
                 "error": {
-                    "type": "string"
-                }
-            }
-        },
-        "protocol.LoginResponse": {
-            "type": "object",
-            "properties": {
-                "redirectURL": {
-                    "type": "string"
-                }
-            }
-        },
-        "protocol.PingResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
                     "type": "string"
                 }
             }
@@ -909,10 +850,49 @@ const docTemplate = `{
                 }
             }
         },
-        "protocol.UpdateUserInfoResponse": {
-            "type": "object"
+        "user.CurUserDTO": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "lastLogin": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permission": {
+                    "type": "string"
+                },
+                "userID": {
+                    "type": "integer"
+                }
+            }
         },
-        "protocol.User": {
+        "user.CurUserInfoResponse": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/user.CurUserDTO"
+                }
+            }
+        },
+        "user.UpdateUserInfoResponse": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "user.UserDTO": {
             "type": "object",
             "properties": {
                 "avatar": {
@@ -932,6 +912,14 @@ const docTemplate = `{
                 },
                 "userID": {
                     "type": "integer"
+                }
+            }
+        },
+        "user.UserInfoResponse": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/user.UserDTO"
                 }
             }
         }

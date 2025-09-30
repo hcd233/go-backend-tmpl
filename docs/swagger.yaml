@@ -1,53 +1,21 @@
 basePath: /
 definitions:
-  protocol.CallbackResponse:
+  auth.CallbackResponse:
     properties:
       accessToken:
         type: string
       refreshToken:
         type: string
     type: object
-  protocol.CurUser:
+  auth.LoginResponse:
     properties:
-      avatar:
+      redirectURL:
         type: string
-      createdAt:
-        type: string
-      email:
-        type: string
-      lastLogin:
-        type: string
-      name:
-        type: string
-      permission:
-        type: string
-      userID:
-        type: integer
-    type: object
-  protocol.GetCurUserInfoResponse:
-    properties:
-      user:
-        $ref: '#/definitions/protocol.CurUser'
-    type: object
-  protocol.GetUserInfoResponse:
-    properties:
-      user:
-        $ref: '#/definitions/protocol.User'
     type: object
   protocol.HTTPResponse:
     properties:
       data: {}
       error:
-        type: string
-    type: object
-  protocol.LoginResponse:
-    properties:
-      redirectURL:
-        type: string
-    type: object
-  protocol.PingResponse:
-    properties:
-      status:
         type: string
     type: object
   protocol.RefreshTokenBody:
@@ -71,9 +39,34 @@ definitions:
     required:
     - userName
     type: object
-  protocol.UpdateUserInfoResponse:
+  user.CurUserDTO:
+    properties:
+      avatar:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      lastLogin:
+        type: string
+      name:
+        type: string
+      permission:
+        type: string
+      userID:
+        type: integer
     type: object
-  protocol.User:
+  user.CurUserInfoResponse:
+    properties:
+      user:
+        $ref: '#/definitions/user.CurUserDTO'
+    type: object
+  user.UpdateUserInfoResponse:
+    properties:
+      success:
+        type: boolean
+    type: object
+  user.UserDTO:
     properties:
       avatar:
         type: string
@@ -87,6 +80,11 @@ definitions:
         type: string
       userID:
         type: integer
+    type: object
+  user.UserInfoResponse:
+    properties:
+      user:
+        $ref: '#/definitions/user.UserDTO'
     type: object
 host: localhost:8080
 info:
@@ -105,7 +103,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: 健康检查
+      description: Health check endpoint
       produces:
       - application/json
       responses:
@@ -116,19 +114,24 @@ paths:
             - $ref: '#/definitions/protocol.HTTPResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/protocol.PingResponse'
+                  type: string
                 error:
                   type: object
               type: object
-      summary: 健康检查
+      summary: Ping
       tags:
-      - ping
+      - health
   /v1/oauth2/{provider}/callback:
     get:
       consumes:
       - application/json
-      description: OAuth2回调请求,验证code和state
+      description: 处理OAuth2授权回调
       parameters:
+      - description: OAuth2提供商 (github/google)
+        in: path
+        name: provider
+        required: true
+        type: string
       - description: 授权码
         in: query
         name: code
@@ -149,7 +152,7 @@ paths:
             - $ref: '#/definitions/protocol.HTTPResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/protocol.CallbackResponse'
+                  $ref: '#/definitions/auth.CallbackResponse'
                 error:
                   type: object
               type: object
@@ -166,17 +169,6 @@ paths:
               type: object
         "401":
           description: Unauthorized
-          schema:
-            allOf:
-            - $ref: '#/definitions/protocol.HTTPResponse'
-            - properties:
-                data:
-                  type: object
-                error:
-                  type: string
-              type: object
-        "403":
-          description: Forbidden
           schema:
             allOf:
             - $ref: '#/definitions/protocol.HTTPResponse'
@@ -204,7 +196,13 @@ paths:
     get:
       consumes:
       - application/json
-      description: OAuth2登录请求,返回重定向URL
+      description: 获取OAuth2授权URL
+      parameters:
+      - description: OAuth2提供商 (github/google)
+        in: path
+        name: provider
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -215,34 +213,12 @@ paths:
             - $ref: '#/definitions/protocol.HTTPResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/protocol.LoginResponse'
+                  $ref: '#/definitions/auth.LoginResponse'
                 error:
                   type: object
               type: object
         "400":
           description: Bad Request
-          schema:
-            allOf:
-            - $ref: '#/definitions/protocol.HTTPResponse'
-            - properties:
-                data:
-                  type: object
-                error:
-                  type: string
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            allOf:
-            - $ref: '#/definitions/protocol.HTTPResponse'
-            - properties:
-                data:
-                  type: object
-                error:
-                  type: string
-              type: object
-        "403":
-          description: Forbidden
           schema:
             allOf:
             - $ref: '#/definitions/protocol.HTTPResponse'
@@ -270,9 +246,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: 刷新令牌
+      description: 使用refresh token获取新的access token
       parameters:
-      - description: 刷新令牌请求体
+      - description: 刷新令牌请求
         in: body
         name: body
         required: true
@@ -292,6 +268,28 @@ paths:
                 error:
                   type: object
               type: object
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/protocol.HTTPResponse'
+            - properties:
+                data:
+                  type: object
+                error:
+                  type: string
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/protocol.HTTPResponse'
+            - properties:
+                data:
+                  type: object
+                error:
+                  type: string
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -303,9 +301,7 @@ paths:
                 error:
                   type: string
               type: object
-      security:
-      - ApiKeyAuth: []
-      summary: 刷新令牌
+      summary: 刷新访问令牌
       tags:
       - token
   /v1/user:
@@ -330,7 +326,7 @@ paths:
             - $ref: '#/definitions/protocol.HTTPResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/protocol.UpdateUserInfoResponse'
+                  $ref: '#/definitions/user.UpdateUserInfoResponse'
                 error:
                   type: object
               type: object
@@ -389,7 +385,8 @@ paths:
       - application/json
       description: 获取用户信息
       parameters:
-      - in: path
+      - description: 用户ID
+        in: path
         name: userID
         required: true
         type: integer
@@ -403,7 +400,7 @@ paths:
             - $ref: '#/definitions/protocol.HTTPResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/protocol.GetUserInfoResponse'
+                  $ref: '#/definitions/user.UserInfoResponse'
                 error:
                   type: object
               type: object
@@ -471,7 +468,7 @@ paths:
             - $ref: '#/definitions/protocol.HTTPResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/protocol.GetCurUserInfoResponse'
+                  $ref: '#/definitions/user.CurUserInfoResponse'
                 error:
                   type: object
               type: object

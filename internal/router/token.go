@@ -3,13 +3,14 @@ package router
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/hcd233/go-backend-tmpl/internal/config"
-	"github.com/hcd233/go-backend-tmpl/internal/handler"
+	"github.com/hcd233/go-backend-tmpl/internal/infrastructure/container"
 	"github.com/hcd233/go-backend-tmpl/internal/middleware"
 	"github.com/hcd233/go-backend-tmpl/internal/protocol"
 )
 
-func initTokenRouter(r fiber.Router) {
-	tokenHandler := handler.NewTokenHandler()
+// initTokenRouter 初始化Token路由（使用依赖注入）
+func initTokenRouter(r fiber.Router, c *container.Container) {
+	tokenHandler := c.GetTokenHandler()
 
 	tokenRouter := r.Group("/token")
 	{

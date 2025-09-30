@@ -64,7 +64,7 @@ func InitDatabase() {
 	// 	})
 	// 	dbHost, dbPort, dbName = config.MysqlHost, config.MysqlPort, config.MysqlDatabase
 
-	db = lo.Must(gorm.Open(dialector, &gorm.Config{
+	db = lo.Must1(gorm.Open(dialector, &gorm.Config{
 		DryRun:         false, // 只生成SQL不运行
 		TranslateError: true,
 		Logger: &GormLoggerAdapter{
@@ -72,7 +72,7 @@ func InitDatabase() {
 		},
 	}))
 
-	sqlDB := lo.Must(db.DB())
+	sqlDB := lo.Must1(db.DB())
 
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)

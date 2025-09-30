@@ -1,35 +1,25 @@
-package handler
+// Package http HTTP接口层
+//
+//	@update 2025-09-30 00:00:00
+package http
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/hcd233/go-backend-tmpl/internal/application/user"
 	"github.com/hcd233/go-backend-tmpl/internal/constant"
 	"github.com/hcd233/go-backend-tmpl/internal/protocol"
-	"github.com/hcd233/go-backend-tmpl/internal/service"
 	"github.com/hcd233/go-backend-tmpl/internal/util"
 )
 
-// UserHandler 用户处理器
-//
-//	author centonhuang
-//	update 2025-01-04 15:56:20
-type UserHandler interface {
-	HandleGetCurUserInfo(c *fiber.Ctx) error
-	HandleGetUserInfo(c *fiber.Ctx) error
-	HandleUpdateInfo(c *fiber.Ctx) error
+// UserHandler 用户HTTP处理器
+type UserHandler struct {
+	userAppService *user.Service
 }
 
-type userHandler struct {
-	svc service.UserService
-}
-
-// NewUserHandler 创建用户处理器
-//
-//	return UserHandler
-//	author centonhuang
-//	update 2024-12-08 16:59:38
-func NewUserHandler() UserHandler {
-	return &userHandler{
-		svc: service.NewUserService(),
+// NewUserHandler 创建用户HTTP处理器
+func NewUserHandler(userAppService *user.Service) *UserHandler {
+	return &UserHandler{
+		userAppService: userAppService,
 	}
 }
 
@@ -41,29 +31,32 @@ func NewUserHandler() UserHandler {
 //	@Accept			json
 //	@Produce		json
 //	@Security		ApiKeyAuth
-//	@Success		200			{object}	protocol.HTTPResponse{data=protocol.GetCurUserInfoResponse,error=nil}
+//	@Success		200			{object}	protocol.HTTPResponse{data=user.CurUserInfoResponse,error=nil}
 //	@Failure		400			{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		401			{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		403			{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		500			{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Router			/v1/user/current [get]
-//	param c *fiber.Ctx
-//	author centonhuang
-//	update 2025-01-04 15:56:30
-func (h *userHandler) HandleGetCurUserInfo(c *fiber.Ctx) error {
+func (h *UserHandler) HandleGetCurUserInfo(c *fiber.Ctx) error {
 	userID := c.Locals(constant.CtxKeyUserID).(uint)
 
-	req := &protocol.GetCurUserInfoRequest{
+	query := &user.GetCurUserInfoQuery{
 		UserID: userID,
 	}
 
-	rsp, err := h.svc.GetCurUserInfo(c.Context(), req)
+	rsp, err := h.userAppService.GetCurUserInfo(c.Context(), query)
+	if err != nil {
+		// 转换应用层错误为protocol错误
+		protocolErr := convertAppErrorToProtocol(err)
+		util.SendHTTPResponse(c, nil, protocolErr)
+		return nil
+	}
 
-	util.SendHTTPResponse(c, rsp, err)
+	util.SendHTTPResponse(c, rsp, nil)
 	return nil
 }
 
-// GetUserInfoHandler 用户信息
+// HandleGetUserInfo 获取用户信息
 //
 //	@Summary		获取用户信息
 //	@Description	获取用户信息
@@ -71,30 +64,32 @@ func (h *userHandler) HandleGetCurUserInfo(c *fiber.Ctx) error {
 //	@Accept			json
 //	@Produce		json
 //	@Security		ApiKeyAuth
-//	@Param			path	path		protocol.UserURI	true	"用户名"
-//	@Success		200		{object}	protocol.HTTPResponse{data=protocol.GetUserInfoResponse,error=nil}
+//	@Param			userID	path		uint	true	"用户ID"
+//	@Success		200		{object}	protocol.HTTPResponse{data=user.UserInfoResponse,error=nil}
 //	@Failure		400		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		401		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		403		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		500		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Router			/v1/user/{userID} [get]
-//	param c *fiber.Ctx
-//	author centonhuang
-//	update 2025-01-04 15:56:30
-func (h *userHandler) HandleGetUserInfo(c *fiber.Ctx) error {
+func (h *UserHandler) HandleGetUserInfo(c *fiber.Ctx) error {
 	uri := c.Locals(constant.CtxKeyURI).(*protocol.UserURI)
 
-	req := &protocol.GetUserInfoRequest{
+	query := &user.GetUserInfoQuery{
 		UserID: uri.UserID,
 	}
 
-	rsp, err := h.svc.GetUserInfo(c.Context(), req)
+	rsp, err := h.userAppService.GetUserInfo(c.Context(), query)
+	if err != nil {
+		protocolErr := convertAppErrorToProtocol(err)
+		util.SendHTTPResponse(c, nil, protocolErr)
+		return nil
+	}
 
-	util.SendHTTPResponse(c, rsp, err)
+	util.SendHTTPResponse(c, rsp, nil)
 	return nil
 }
 
-// UpdateInfoHandler 更新用户信息
+// HandleUpdateInfo 更新用户信息
 //
 //	@Summary		更新用户信息
 //	@Description	更新用户信息
@@ -103,26 +98,29 @@ func (h *userHandler) HandleGetUserInfo(c *fiber.Ctx) error {
 //	@Produce		json
 //	@Security		ApiKeyAuth
 //	@Param			body	body		protocol.UpdateUserBody	true	"更新用户信息请求"
-//	@Success		200		{object}	protocol.HTTPResponse{data=protocol.UpdateUserInfoResponse,error=nil}
+//	@Success		200		{object}	protocol.HTTPResponse{data=user.UpdateUserInfoResponse,error=nil}
 //	@Failure		400		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		401		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		403		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Failure		500		{object}	protocol.HTTPResponse{data=nil,error=string}
 //	@Router			/v1/user [patch]
-//	param c *fiber.Ctx
-//	author centonhuang
-//	update 2025-01-04 15:56:40
-func (h *userHandler) HandleUpdateInfo(c *fiber.Ctx) error {
+func (h *UserHandler) HandleUpdateInfo(c *fiber.Ctx) error {
 	userID := c.Locals(constant.CtxKeyUserID).(uint)
 	body := c.Locals(constant.CtxKeyBody).(*protocol.UpdateUserBody)
 
-	req := &protocol.UpdateUserInfoRequest{
-		UserID:          userID,
-		UpdatedUserName: body.UserName,
+	cmd := &user.UpdateUserInfoCommand{
+		UserID:      userID,
+		UpdatedName: body.UserName,
 	}
 
-	rsp, err := h.svc.UpdateUserInfo(c.Context(), req)
+	rsp, err := h.userAppService.UpdateUserInfo(c.Context(), cmd)
+	if err != nil {
+		protocolErr := convertAppErrorToProtocol(err)
+		util.SendHTTPResponse(c, nil, protocolErr)
+		return nil
+	}
 
-	util.SendHTTPResponse(c, rsp, err)
+	util.SendHTTPResponse(c, rsp, nil)
 	return nil
 }
+
