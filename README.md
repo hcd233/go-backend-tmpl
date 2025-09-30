@@ -263,7 +263,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ### 📖 概述
 
-这是一个基于**领域驱动设计(DDD)**架构原则构建的生产就绪的Golang后端模版。它为构建可扩展、可维护和可测试的Web应用程序提供了坚实的基础。
+这是一个基于**领域驱动设计**架构原则构建的生产就绪的Golang后端模版。它为构建可扩展、可维护和可测试的Web应用程序提供了坚实的基础。
 
 ### ✨ 特性
 
