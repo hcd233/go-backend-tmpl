@@ -5,13 +5,15 @@
 package pool
 
 import (
+	"context"
+
 	"github.com/alitto/pond/v2"
 	"github.com/hcd233/aris-api-tmpl/internal/config"
 	"github.com/hcd233/aris-api-tmpl/internal/dto"
 	"github.com/hcd233/aris-api-tmpl/internal/logger"
 )
 
-// Manager 全局协程池管理器
+// Manager 协程池管理器，通过依赖注入构造。
 //
 //	author centonhuang
 //	update 2026-01-31 16:00:00
@@ -19,40 +21,20 @@ type Manager struct {
 	pingPool pond.Pool
 }
 
-var poolManager *Manager
-
-// InitPoolManager 初始化全局协程池管理器
+// InitPoolManager 初始化协程池管理器并返回实例（供依赖注入使用）。
 //
+//	@return *Manager
 //	@author centonhuang
 //	@update 2026-01-31 03:37:28
-func InitPoolManager() {
-	poolManager = &Manager{
+func InitPoolManager() *Manager {
+	return &Manager{
 		pingPool: pond.NewPool(config.PoolWorkers, pond.WithQueueSize(config.PoolQueueSize)),
 	}
 }
 
-// GetPoolManager 获取全局协程池管理器实例
+// SubmitPingTask 提交异步 ping 示例任务。
 //
-//	return *PoolManager
-//	author centonhuang
-//	update 2026-01-31 16:00:00
-func GetPoolManager() *Manager {
-	return poolManager
-}
-
-// StopPoolManager 停止全局协程池管理器
-//
-//	@author centonhuang
-//	@update 2026-01-31 03:47:43
-func StopPoolManager() {
-	if poolManager != nil {
-		poolManager.Stop()
-	}
-}
-
-// SubmitImageUploadTask InitImageUploadPool 初始化图片上传协程池
-//
-//	@receiver pm *PoolManager
+//	@receiver pm *Manager
 //	@param task
 //	@return error
 //	@author centonhuang
@@ -64,12 +46,25 @@ func (pm *Manager) SubmitPingTask(task *dto.PingTask) error {
 	})
 }
 
-// Stop 停止所有协程池
+// StopWithContext 带超时优雅停止所有协程池（供优雅退出钩子调用）。
 //
-//	author centonhuang
-//	update 2026-01-31 16:00:00
-func (pm *Manager) Stop() {
-	if pm.pingPool != nil {
-		pm.pingPool.Stop()
+//	@receiver pm *Manager
+//	@param ctx context.Context 停止超时上下文
+//	@return error
+func (pm *Manager) StopWithContext(ctx context.Context) error {
+	if pm.pingPool == nil {
+		return nil
+	}
+	task := pm.pingPool.Stop()
+	done := make(chan struct{})
+	go func() {
+		_ = task.Wait() //nolint:errcheck // Stop future 无错误返回
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }

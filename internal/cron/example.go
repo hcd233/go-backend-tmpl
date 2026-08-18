@@ -26,6 +26,7 @@ type ExampleCron struct {
 func NewExampleCron() Cron {
 	return &ExampleCron{
 		cron: cron.New(
+			cron.WithSeconds(), // 表达式含秒字段（如 "*/10 * * * * *"）
 			cron.WithLogger(newCronLoggerAdapter("ExampleCron", logger.Logger())),
 		),
 	}
