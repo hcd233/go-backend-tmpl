@@ -6,6 +6,12 @@ OUTPUT   := $(APP_NAME)
 
 GOMAXPROCS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
+# 显式测试包列表：cmd + internal + test（不含 web 等非 Go 目录）
+GO_TEST_PACKAGES := ./cmd/... ./internal/... ./test/...
+
+# golangci-lint 版本（CI 与本地对齐）
+GOLANGCI_LINT_VERSION := v2.12.2
+
 LDFLAGS     := -s -w
 BUILD_FLAGS := -trimpath -p $(GOMAXPROCS)
 
@@ -59,13 +65,13 @@ fmt:
 vet:
 	go vet ./...
 
-## test: 运行全量测试
+## test: 运行全量测试（cmd + internal + test）
 test:
-	go test -count=1 ./...
+	go test -count=1 $(GO_TEST_PACKAGES)
 
 ## test-cover: 带覆盖率的测试
 test-cover:
-	go test -count=1 -coverprofile=coverage.out ./...
+	go test -count=1 -coverprofile=coverage.out $(GO_TEST_PACKAGES)
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aris-api-tmpl
+  namespace: aris-api-tmpl
+  labels:
+    app: aris-api-tmpl
+spec:
+  replicas: 2
+  # 蓝绿式滚动：先起新 Pod 再摘旧 Pod，滚动期间零中断
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2
+  # 优雅退出预算：preStop 10s + inflight drain soft 5min + hard 30s + 收尾余量
+  terminationGracePeriodSeconds: 480
+  selector:
+    matchLabels:
+      app: aris-api-tmpl
+  template:
+    metadata:
+      labels:
+        app: aris-api-tmpl
+    spec:
+      securityContext:
+        fsGroup: 65532
+      containers:
+        - name: aris-api-tmpl
+          image: ghcr.io/<OWNER>/aris-api-tmpl:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: aris-api-tmpl-config
+            - secretRef:
+                name: aris-api-tmpl-secret
+          env:
+            # Go 软内存上限（limits 的 ~86%）：提前 GC 防贴边 OOMKill
+            - name: GOMEMLIMIT
+              value: "440MiB"
+          ports:
+            - name: http
+              containerPort: 8080
+          # 双探针分离：liveness 判定进程存活，readiness 判定流量可入
+          # 优雅退出时（draining）readiness 返回 503，先摘流量再停进程
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                # 给 readiness 探针失效留出窗口，让负载均衡停止转发后再停进程
+                command: ["sleep", "10"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: logs
+          emptyDir:
+            sizeLimit: 512Mi
