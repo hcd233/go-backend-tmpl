@@ -6,8 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/hcd233/aris-api-tmpl/internal/api"
 	identitycommand "github.com/hcd233/aris-api-tmpl/internal/application/identity/command"
+	identityport "github.com/hcd233/aris-api-tmpl/internal/application/identity/port"
 	identityquery "github.com/hcd233/aris-api-tmpl/internal/application/identity/query"
 	oauth2command "github.com/hcd233/aris-api-tmpl/internal/application/oauth2/command"
+	oauth2port "github.com/hcd233/aris-api-tmpl/internal/application/oauth2/port"
 	"github.com/hcd233/aris-api-tmpl/internal/common/constant"
 	"github.com/hcd233/aris-api-tmpl/internal/config"
 	"github.com/hcd233/aris-api-tmpl/internal/domain/identity"
@@ -141,7 +143,7 @@ func newUserRepository() identity.UserRepository {
 	return repository.NewUserRepository()
 }
 
-func newAudioDirCreator() oauth2command.ObjectStorageDirCreator {
+func newAudioDirCreator() oauth2port.ObjectStorageDirCreator {
 	if config.CosAppID == "" && config.MinioEndpoint == "" {
 		return nil
 	}
@@ -172,7 +174,7 @@ type refreshTokensParams struct {
 	RefreshSigner identityservice.TokenSigner `name:"refreshSigner"`
 }
 
-func newRefreshTokensHandler(params refreshTokensParams) identitycommand.RefreshTokensHandler {
+func newRefreshTokensHandler(params refreshTokensParams) identityport.RefreshTokensHandler {
 	return identitycommand.NewRefreshTokensHandler(params.UserRepo, params.AccessSigner, params.RefreshSigner)
 }
 
@@ -183,10 +185,10 @@ type handleCallbackParams struct {
 	UserRepo      identity.UserRepository
 	AccessSigner  identityservice.TokenSigner `name:"accessSigner"`
 	RefreshSigner identityservice.TokenSigner `name:"refreshSigner"`
-	DirCreator    oauth2command.ObjectStorageDirCreator
+	DirCreator    oauth2port.ObjectStorageDirCreator
 }
 
-func newHandleCallbackHandler(params handleCallbackParams) oauth2command.HandleCallbackHandler {
+func newHandleCallbackHandler(params handleCallbackParams) oauth2port.HandleCallbackHandler {
 	return oauth2command.NewHandleCallbackHandler(
 		params.Platforms,
 		params.UserRepo,
@@ -196,14 +198,14 @@ func newHandleCallbackHandler(params handleCallbackParams) oauth2command.HandleC
 	)
 }
 
-func newTokenDependencies(refresh identitycommand.RefreshTokensHandler) handler.TokenDependencies {
+func newTokenDependencies(refresh identityport.RefreshTokensHandler) handler.TokenDependencies {
 	return handler.TokenDependencies{Refresh: refresh}
 }
 
-func newOauth2Dependencies(initiate oauth2command.InitiateLoginHandler, callback oauth2command.HandleCallbackHandler) handler.Oauth2Dependencies {
+func newOauth2Dependencies(initiate oauth2port.InitiateLoginHandler, callback oauth2port.HandleCallbackHandler) handler.Oauth2Dependencies {
 	return handler.Oauth2Dependencies{Initiate: initiate, Callback: callback}
 }
 
-func newUserDependencies(getCurrentUser identityquery.GetCurrentUserHandler, updateProfile identitycommand.UpdateProfileHandler) handler.UserDependencies {
+func newUserDependencies(getCurrentUser identityport.GetCurrentUserHandler, updateProfile identityport.UpdateProfileHandler) handler.UserDependencies {
 	return handler.UserDependencies{GetCurrentUser: getCurrentUser, UpdateProfile: updateProfile}
 }

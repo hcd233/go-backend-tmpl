@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 
+	identityport "github.com/hcd233/aris-api-tmpl/internal/application/identity/port"
 	"github.com/hcd233/aris-api-tmpl/internal/common/ierr"
 	"github.com/hcd233/aris-api-tmpl/internal/domain/identity"
 	"github.com/hcd233/aris-api-tmpl/internal/domain/identity/service"
@@ -12,16 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// RefreshTokensCommand 刷新 token 对命令。
-type RefreshTokensCommand struct {
-	RefreshToken string
-}
-
-// RefreshTokensHandler 刷新命令处理器。
-type RefreshTokensHandler interface {
-	Handle(ctx context.Context, cmd RefreshTokensCommand) (*vo.TokenPair, error)
-}
-
 type refreshTokensHandler struct {
 	repo    identity.UserRepository
 	access  service.TokenSigner
@@ -29,12 +20,12 @@ type refreshTokensHandler struct {
 }
 
 // NewRefreshTokensHandler 构造刷新令牌处理器。
-func NewRefreshTokensHandler(repo identity.UserRepository, access, refresh service.TokenSigner) RefreshTokensHandler {
+func NewRefreshTokensHandler(repo identity.UserRepository, access, refresh service.TokenSigner) identityport.RefreshTokensHandler {
 	return &refreshTokensHandler{repo: repo, access: access, refresh: refresh}
 }
 
 // Handle 执行刷新令牌流程。
-func (h *refreshTokensHandler) Handle(ctx context.Context, cmd RefreshTokensCommand) (*vo.TokenPair, error) {
+func (h *refreshTokensHandler) Handle(ctx context.Context, cmd identityport.RefreshTokensCommand) (*vo.TokenPair, error) {
 	log := logger.WithCtx(ctx)
 	userID, err := h.refresh.DecodeToken(cmd.RefreshToken)
 	if err != nil {

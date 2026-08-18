@@ -9,13 +9,11 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.80
-	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/client_model v0.6.2
 	github.com/samber/lo v1.39.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.60
-	go.uber.org/fx v1.24.0
+	go.uber.org/dig v1.19.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.36.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -26,7 +24,6 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
-	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/clbanning/mxj v1.8.4 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
@@ -38,15 +35,11 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/mozillazg/go-httpheader v0.4.0 // indirect
-	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
-	github.com/prometheus/common v0.70.1 // indirect
-	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	go.uber.org/dig v1.19.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 )
 
 require (

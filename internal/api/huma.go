@@ -4,10 +4,17 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humafiber"
 	"github.com/gofiber/fiber/v2"
+	apiutil "github.com/hcd233/aris-api-tmpl/internal/api/util"
 	"github.com/hcd233/aris-api-tmpl/internal/config"
 	"github.com/hcd233/aris-api-tmpl/internal/enum"
 	"github.com/samber/lo"
 )
+
+func init() {
+	// 统一 200 错误契约：huma 框架错误（422/404 等）也转换为
+	// 顶层 {"error": {code, message}} 结构，与 handler 错误、中间件错误一致。
+	huma.NewError = apiutil.FrameworkError
+}
 
 // NewHumaAPI 创建 Huma API 实例。
 func NewHumaAPI(app *fiber.App) huma.API {

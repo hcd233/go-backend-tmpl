@@ -4,7 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/hcd233/aris-api-tmpl/internal/application/identity/command"
+	apiutil "github.com/hcd233/aris-api-tmpl/internal/api/util"
+	identityport "github.com/hcd233/aris-api-tmpl/internal/application/identity/port"
 	"github.com/hcd233/aris-api-tmpl/internal/common/ierr"
 	"github.com/hcd233/aris-api-tmpl/internal/dto"
 	"github.com/hcd233/aris-api-tmpl/internal/logger"
@@ -19,11 +20,11 @@ type TokenHandler interface {
 
 // TokenDependencies TokenHandler 依赖项。
 type TokenDependencies struct {
-	Refresh command.RefreshTokensHandler
+	Refresh identityport.RefreshTokensHandler
 }
 
 type tokenHandler struct {
-	refresh command.RefreshTokensHandler
+	refresh identityport.RefreshTokensHandler
 }
 
 // NewTokenHandler 创建令牌处理器。
@@ -33,19 +34,18 @@ func NewTokenHandler(deps TokenDependencies) TokenHandler {
 
 // HandleRefreshToken 刷新令牌。
 func (h *tokenHandler) HandleRefreshToken(ctx context.Context, req *dto.RefreshTokenReq) (*dto.HTTPResponse[*dto.RefreshTokenRsp], error) {
-	rsp := &dto.RefreshTokenRsp{}
 	if req == nil || req.Body == nil || strings.TrimSpace(req.Body.RefreshToken) == "" {
-		rsp.Error = ierr.ErrValidation.BizError()
-		return util.WrapHTTPResponse(rsp, nil)
+		return nil, apiutil.NewHumaBizErrorFromModel(ctx, ierr.ErrValidation.BizError())
 	}
-	pair, err := h.refresh.Handle(ctx, command.RefreshTokensCommand{RefreshToken: req.Body.RefreshToken})
+	pair, err := h.refresh.Handle(ctx, identityport.RefreshTokensCommand{RefreshToken: req.Body.RefreshToken})
 	if err != nil {
 		logger.WithCtx(ctx).Warn("[TokenHandler] refresh token failed",
 			zap.String("refreshToken", util.MaskSecret(req.Body.RefreshToken)), zap.Error(err))
-		rsp.Error = ierr.ToBizError(err, ierr.ErrInternal.BizError())
-		return util.WrapHTTPResponse(rsp, nil)
+		return nil, apiutil.NewHumaBizError(ctx, err, ierr.ErrInternal.BizError())
 	}
-	rsp.AccessToken = pair.AccessToken()
-	rsp.RefreshToken = pair.RefreshToken()
+	rsp := &dto.RefreshTokenRsp{
+		AccessToken:  pair.AccessToken(),
+		RefreshToken: pair.RefreshToken(),
+	}
 	return util.WrapHTTPResponse(rsp, nil)
 }

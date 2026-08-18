@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	oauth2port "github.com/hcd233/aris-api-tmpl/internal/application/oauth2/port"
 	"github.com/hcd233/aris-api-tmpl/internal/common/constant"
 	"github.com/hcd233/aris-api-tmpl/internal/common/ierr"
 	"github.com/hcd233/aris-api-tmpl/internal/config"
@@ -21,32 +22,17 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// InitiateLoginCommand 发起 OAuth 登录命令。
-type InitiateLoginCommand struct {
-	Platform string
-}
-
-// InitiateLoginResult 登录发起结果。
-type InitiateLoginResult struct {
-	RedirectURL string
-}
-
-// InitiateLoginHandler 登录发起命令处理器。
-type InitiateLoginHandler interface {
-	Handle(ctx context.Context, cmd InitiateLoginCommand) (*InitiateLoginResult, error)
-}
-
 type initiateLoginHandler struct {
 	platforms map[string]oauth2service.Platform
 }
 
 // NewInitiateLoginHandler 构造登录发起处理器。
-func NewInitiateLoginHandler(platforms map[string]oauth2service.Platform) InitiateLoginHandler {
+func NewInitiateLoginHandler(platforms map[string]oauth2service.Platform) oauth2port.InitiateLoginHandler {
 	return &initiateLoginHandler{platforms: platforms}
 }
 
 // Handle 执行登录发起流程。
-func (h *initiateLoginHandler) Handle(ctx context.Context, cmd InitiateLoginCommand) (*InitiateLoginResult, error) {
+func (h *initiateLoginHandler) Handle(ctx context.Context, cmd oauth2port.InitiateLoginCommand) (*oauth2port.InitiateLoginResult, error) {
 	platform, ok := h.platforms[cmd.Platform]
 	if !ok {
 		logger.WithCtx(ctx).Warn("[OAuth2Command] invalid platform on initiate", zap.String("platform", cmd.Platform))
@@ -54,31 +40,7 @@ func (h *initiateLoginHandler) Handle(ctx context.Context, cmd InitiateLoginComm
 	}
 	url := platform.GetAuthURL()
 	logger.WithCtx(ctx).Info("[OAuth2Command] initiate login", zap.String("platform", cmd.Platform))
-	return &InitiateLoginResult{RedirectURL: url}, nil
-}
-
-// HandleCallbackCommand OAuth2 回调处理命令。
-type HandleCallbackCommand struct {
-	Platform string
-	Code     string
-	State    string
-}
-
-// HandleCallbackResult 回调处理结果。
-type HandleCallbackResult struct {
-	TokenPair *identityvo.TokenPair
-	UserID    uint
-	IsNewUser bool
-}
-
-// ObjectStorageDirCreator 对象存储目录创建器。
-type ObjectStorageDirCreator interface {
-	CreateDir(ctx context.Context, userID uint) error
-}
-
-// HandleCallbackHandler 回调命令处理器。
-type HandleCallbackHandler interface {
-	Handle(ctx context.Context, cmd HandleCallbackCommand) (*HandleCallbackResult, error)
+	return &oauth2port.InitiateLoginResult{RedirectURL: url}, nil
 }
 
 type handleCallbackHandler struct {
@@ -86,7 +48,7 @@ type handleCallbackHandler struct {
 	userRepo      identity.UserRepository
 	accessSigner  identityservice.TokenSigner
 	refreshSigner identityservice.TokenSigner
-	dirCreator    ObjectStorageDirCreator
+	dirCreator    oauth2port.ObjectStorageDirCreator
 }
 
 // NewHandleCallbackHandler 构造回调处理器。
@@ -94,8 +56,8 @@ func NewHandleCallbackHandler(
 	platforms map[string]oauth2service.Platform,
 	userRepo identity.UserRepository,
 	accessSigner, refreshSigner identityservice.TokenSigner,
-	dirCreator ObjectStorageDirCreator,
-) HandleCallbackHandler {
+	dirCreator oauth2port.ObjectStorageDirCreator,
+) oauth2port.HandleCallbackHandler {
 	return &handleCallbackHandler{
 		platforms:     platforms,
 		userRepo:      userRepo,
@@ -106,7 +68,7 @@ func NewHandleCallbackHandler(
 }
 
 // Handle 执行 OAuth2 回调流程。
-func (h *handleCallbackHandler) Handle(ctx context.Context, cmd HandleCallbackCommand) (*HandleCallbackResult, error) {
+func (h *handleCallbackHandler) Handle(ctx context.Context, cmd oauth2port.HandleCallbackCommand) (*oauth2port.HandleCallbackResult, error) {
 	platform, err := h.validateStateAndPlatform(ctx, cmd.State, cmd.Platform)
 	if err != nil {
 		return nil, err
@@ -126,7 +88,7 @@ func (h *handleCallbackHandler) Handle(ctx context.Context, cmd HandleCallbackCo
 	logger.WithCtx(ctx).Info("[OAuth2Command] callback success",
 		zap.String("platform", cmd.Platform), zap.Uint("userID", userID), zap.Bool("isNewUser", isNewUser))
 	pair := identityvo.NewTokenPair(accessToken, refreshToken)
-	return &HandleCallbackResult{TokenPair: &pair, UserID: userID, IsNewUser: isNewUser}, nil
+	return &oauth2port.HandleCallbackResult{TokenPair: &pair, UserID: userID, IsNewUser: isNewUser}, nil
 }
 
 func (h *handleCallbackHandler) validateStateAndPlatform(ctx context.Context, state, platform string) (oauth2service.Platform, error) {
@@ -159,7 +121,7 @@ func (h *handleCallbackHandler) exchangeAndFetchUser(ctx context.Context, platfo
 	return userInfo, nil
 }
 
-func (h *handleCallbackHandler) resolveUser(ctx context.Context, platformName string, userInfo oauth2vo.OAuthUserInfo) (uint, bool, error) {
+func (h *handleCallbackHandler) resolveUser(ctx context.Context, platformName string, userInfo oauth2vo.OAuthUserInfo) (userID uint, isNewUser bool, err error) {
 	log := logger.WithCtx(ctx)
 	thirdPartyID := userInfo.ID()
 	userName := userInfo.Name()
@@ -200,13 +162,13 @@ func (h *handleCallbackHandler) resolveUser(ctx context.Context, platformName st
 	return user.AggregateID(), true, nil
 }
 
-func (h *handleCallbackHandler) signTokenPair(ctx context.Context, userID uint) (string, string, error) {
-	accessToken, err := h.accessSigner.EncodeToken(userID)
+func (h *handleCallbackHandler) signTokenPair(ctx context.Context, userID uint) (accessToken, refreshToken string, err error) {
+	accessToken, err = h.accessSigner.EncodeToken(userID)
 	if err != nil {
 		logger.WithCtx(ctx).Error("[OAuth2Command] failed to encode access token", zap.Error(err))
 		return "", "", ierr.Wrap(ierr.ErrJWTEncode, err, "encode access token")
 	}
-	refreshToken, err := h.refreshSigner.EncodeToken(userID)
+	refreshToken, err = h.refreshSigner.EncodeToken(userID)
 	if err != nil {
 		logger.WithCtx(ctx).Error("[OAuth2Command] failed to encode refresh token", zap.Error(err))
 		return "", "", ierr.Wrap(ierr.ErrJWTEncode, err, "encode refresh token")
