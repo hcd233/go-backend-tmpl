@@ -64,7 +64,7 @@ type middlewareParams struct {
 	MetricsMiddleware fiber.Handler
 }
 
-// registerMiddlewares 注册全局中间件链，顺序：Recover → Metrics → Inflight → Fgprof → CORS → Compress → Trace → Locale → Log
+// registerMiddlewares 注册全局中间件链，顺序：Recover → Metrics → Inflight → Guard → Fgprof → CORS → Compress → Trace → Locale → Log
 func registerMiddlewares(params middlewareParams) {
 	// 标准 Prometheus 文本端点，供 Prometheus 抓取
 	params.App.Get(constant.RoutePathMetrics, adaptor.HTTPHandler(promhttp.HandlerFor(params.Registry, promhttp.HandlerOpts{})))
@@ -73,6 +73,19 @@ func registerMiddlewares(params middlewareParams) {
 		middleware.RecoverMiddleware(),
 		params.MetricsMiddleware,
 		middleware.InflightMiddleware(params.InflightTracker),
+		middleware.GuardMiddleware(params.Cache, middleware.GuardConfig{
+			StrikeThreshold: constant.GuardStrikeThreshold,
+			StrikeWindow:    constant.GuardStrikeWindow,
+			BanDuration:     constant.GuardBanDuration,
+			AllowIPs:        config.GuardAllowIPs,
+			IgnoredPaths: []string{
+				constant.RoutePathRoot,
+				constant.RoutePathHealth,
+				constant.RoutePathReady,
+				constant.RoutePathSSEHealth,
+				constant.RoutePathMetrics,
+			},
+		}),
 		middleware.FgprofMiddleware(),
 		middleware.CORSMiddleware(),
 		middleware.CompressMiddleware(),
