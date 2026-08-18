@@ -24,6 +24,7 @@ func TestNormalizeTargets(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := normalizeTargets(tt.args)
 			if len(got) != len(tt.want) {
 				t.Fatalf("normalizeTargets() length = %d, want %d", len(got), len(tt.want))

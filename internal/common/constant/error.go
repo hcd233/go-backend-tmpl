@@ -1,58 +1,49 @@
 package constant
 
-import (
-	"github.com/hcd233/aris-api-tmpl/internal/common/model"
-)
+// ==================== 业务错误码 ====================
+//
+// 统一 200 错误契约下，业务错误码是错误语义的唯一载体：
+// model.Error.StatusCode() 负责业务码 → HTTP 状态码的推导，
+// apiutil.FrameworkError 负责框架错误（422/404 等）反向推导业务码。
+// 新增业务错误时必须同步维护两个方向的映射。
+//
+// 注：业务错误实例统一由 internal/common/ierr 的哨兵错误创建，
+// 本包只定义错误码常量，避免 constant ↔ model 循环依赖。
 
-var (
+const (
+	// BizErrorCodeInternal 内部错误（兜底）
+	BizErrorCodeInternal = 10000
 
-	// ErrInternalError 内部错误
-	//
-	//	update 2025-01-04 17:35:44
-	ErrInternalError = model.NewError(10000, "InternalError")
+	// BizErrorCodeUnauthorized 未授权
+	BizErrorCodeUnauthorized = 10001
 
-	// ErrUnauthorized 未授权错误
-	//
-	//	update 2025-01-04 17:36:00
-	ErrUnauthorized = model.NewError(10001, "Unauthorized")
+	// BizErrorCodeNoPermission 没有权限
+	BizErrorCodeNoPermission = 10002
 
-	// ErrNoPermission 没有权限错误
-	//
-	//	update 2025-01-04 17:36:00
-	ErrNoPermission = model.NewError(10002, "NoPermission")
+	// BizErrorCodeDataNotExists 数据不存在
+	BizErrorCodeDataNotExists = 10003
 
-	// ErrDataNotExists 数据不存在错误
-	//
-	//	update 2025-01-04 17:36:00
-	ErrDataNotExists = model.NewError(10003, "DataNotExists")
+	// BizErrorCodeDataExists 数据已存在
+	BizErrorCodeDataExists = 10004
 
-	// ErrDataExists 数据已存在错误
-	//
-	//	update 2025-01-04 17:36:00
-	ErrDataExists = model.NewError(10004, "DataExists")
+	// BizErrorCodeTooManyRequests 请求过于频繁
+	BizErrorCodeTooManyRequests = 10005
 
-	// ErrTooManyRequests 请求过于频繁错误
-	//
-	//	update 2025-01-04 17:36:00
-	ErrTooManyRequests = model.NewError(10005, "TooManyRequests")
+	// BizErrorCodeBadRequest 请求参数错误
+	BizErrorCodeBadRequest = 10006
 
-	// ErrBadRequest 请求错误
-	//
-	//	update 2025-01-04 17:36:00
-	ErrBadRequest = model.NewError(10006, "BadRequest")
+	// BizErrorCodeInsufficientQuota 配额不足
+	BizErrorCodeInsufficientQuota = 10007
 
-	// ErrInsufficientQuota 配额不足错误
-	//
-	//	update 2025-01-05 18:41:32
-	ErrInsufficientQuota = model.NewError(10007, "InsufficientQuota")
+	// BizErrorCodeNoImplement 未实现
+	BizErrorCodeNoImplement = 10008
 
-	// ErrNoImplement 未实现错误
-	//
-	//	update 2025-01-05 18:41:32
-	ErrNoImplement = model.NewError(10008, "NoImplement")
+	// BizErrorCodeResourceLocked 资源锁定
+	BizErrorCodeResourceLocked = 10009
 
-	// ErrResourceLocked 资源锁定错误
-	//
-	//	update 2025-11-13 17:48:00
-	ErrResourceLocked = model.NewError(10009, "ResourceLocked")
+	// BizErrorDetailSep 框架错误 message 与字段错误细节之间的分隔符
+	BizErrorDetailSep = ": "
+
+	// BizErrorDetailJoinSep 多个字段错误细节之间的分隔符
+	BizErrorDetailJoinSep = "; "
 )

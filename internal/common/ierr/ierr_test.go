@@ -2,13 +2,14 @@ package ierr
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/hcd233/aris-api-tmpl/internal/common/model"
 )
 
 func TestInternalError_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		err      error
@@ -26,12 +27,12 @@ func TestInternalError_Error(t *testing.T) {
 		},
 		{
 			name:     "with cause",
-			err:      Wrap(ErrDBQuery, fmt.Errorf("connection refused"), "select users"),
+			err:      Wrap(ErrDBQuery, errors.New("connection refused"), "select users"),
 			expected: "db_query: select users: connection refused",
 		},
 		{
 			name:     "with formatted message",
-			err:      Wrapf(ErrJWTDecode, fmt.Errorf("token expired"), "user %d", 42),
+			err:      Wrapf(ErrJWTDecode, errors.New("token expired"), "user %d", 42),
 			expected: "jwt_decode: user 42: token expired",
 		},
 		{
@@ -43,6 +44,7 @@ func TestInternalError_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.err.Error(); got != tt.expected {
 				t.Errorf("Error() = %q, want %q", got, tt.expected)
 			}
@@ -51,33 +53,41 @@ func TestInternalError_Error(t *testing.T) {
 }
 
 func TestInternalError_Is(t *testing.T) {
-	cause := fmt.Errorf("underlying error")
+	t.Parallel()
+
+	cause := errors.New("underlying error")
 	wrapped := Wrap(ErrDBQuery, cause, "query failed")
 
 	t.Run("same sentinel matches", func(t *testing.T) {
+		t.Parallel()
 		if !errors.Is(wrapped, ErrDBQuery) {
 			t.Error("expected wrapped error to match ErrDBQuery sentinel")
 		}
 	})
 
 	t.Run("different sentinel does not match", func(t *testing.T) {
+		t.Parallel()
 		if errors.Is(wrapped, ErrDBCreate) {
 			t.Error("expected wrapped error NOT to match ErrDBCreate sentinel")
 		}
 	})
 
 	t.Run("non-InternalError target does not match", func(t *testing.T) {
-		if errors.Is(wrapped, fmt.Errorf("some other error")) {
+		t.Parallel()
+		if errors.Is(wrapped, errors.New("some other error")) {
 			t.Error("expected wrapped error NOT to match plain error")
 		}
 	})
 }
 
 func TestInternalError_Unwrap(t *testing.T) {
-	cause := fmt.Errorf("root cause")
+	t.Parallel()
+
+	cause := errors.New("root cause")
 	wrapped := Wrap(ErrDBQuery, cause, "query failed")
 
 	t.Run("unwrap returns cause", func(t *testing.T) {
+		t.Parallel()
 		var ie *InternalError
 		if !errors.As(wrapped, &ie) {
 			t.Fatal("expected errors.As to succeed")
@@ -88,6 +98,7 @@ func TestInternalError_Unwrap(t *testing.T) {
 	})
 
 	t.Run("no cause returns nil", func(t *testing.T) {
+		t.Parallel()
 		noCause := New(ErrDBQuery, "no cause")
 		var ie *InternalError
 		if !errors.As(noCause, &ie) {
@@ -100,6 +111,8 @@ func TestInternalError_Unwrap(t *testing.T) {
 }
 
 func TestInternalError_BizError(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		sentinel     *InternalError
@@ -119,6 +132,7 @@ func TestInternalError_BizError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			biz := tt.sentinel.BizError()
 			if biz.Code != tt.expectedCode {
 				t.Errorf("BizError().Code = %d, want %d", biz.Code, tt.expectedCode)
@@ -131,10 +145,13 @@ func TestInternalError_BizError(t *testing.T) {
 }
 
 func TestToBizError(t *testing.T) {
+	t.Parallel()
+
 	fallback := model.NewError(99999, "Fallback")
 
 	t.Run("extracts biz error from InternalError", func(t *testing.T) {
-		err := Wrap(ErrJWTDecode, fmt.Errorf("expired"), "token check")
+		t.Parallel()
+		err := Wrap(ErrJWTDecode, errors.New("expired"), "token check")
 		biz := ToBizError(err, fallback)
 		if biz.Code != 10001 {
 			t.Errorf("ToBizError().Code = %d, want 10001", biz.Code)
@@ -142,7 +159,8 @@ func TestToBizError(t *testing.T) {
 	})
 
 	t.Run("returns fallback for non-InternalError", func(t *testing.T) {
-		err := fmt.Errorf("plain error")
+		t.Parallel()
+		err := errors.New("plain error")
 		biz := ToBizError(err, fallback)
 		if biz != fallback {
 			t.Errorf("ToBizError() = %v, want fallback %v", biz, fallback)

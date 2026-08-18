@@ -58,12 +58,12 @@ func (h *pingHandler) HandleSSEPing(_ context.Context, _ *dto.EmptyReq) (rsp *hu
 			fCtx.Set("X-Accel-Buffering", "no")
 
 			fCtx.Response().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
-				for i := 0; i < 30; i++ {
+				for i := range 30 {
 					data := &dto.SSEResponse{
 						DataType: enum.SSEDataTypeHeartBeat,
 						Data:     strconv.Itoa(i),
 					}
-					fmt.Fprintf(w, "data: %s\n\n", lo.Must1(sonic.Marshal(data)))
+					fmt.Fprintf(w, "data: %s\n\n", lo.Must1(sonic.Marshal(data))) //nolint:errcheck // SSE 写入错误由 Flush 捕获
 					err := w.Flush()
 					if err != nil {
 						return

@@ -39,7 +39,7 @@ func JwtMiddleware() func(ctx huma.Context, next func(huma.Context)) {
 		}
 		userID, err := accessTokenSvc.DecodeToken(tokenString)
 		if err != nil {
-			lo.Must0(util.WriteErrorResponse(ctx.BodyWriter(), ierr.ErrJWTDecode.BizError()))
+			lo.Must0(util.WriteErrorResponse(ctx.BodyWriter(), ierr.ToBizError(err, ierr.ErrJWTDecode.BizError())))
 			return
 		}
 		user, err := dao.Get(db, &model.User{ID: userID}, []string{"id", "name", "permission"})

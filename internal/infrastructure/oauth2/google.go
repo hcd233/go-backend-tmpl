@@ -102,7 +102,7 @@ func (p *googlePlatform) GetUserInfo(ctx context.Context, token *oauth2.Token) (
 		log.Error("[GoogleOauth2] failed to call userinfo API", zap.Error(err))
 		return vo.OAuthUserInfo{}, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // best-effort close
 	log.Info("[GoogleOauth2] userinfo API response", zap.Int("statusCode", resp.StatusCode))
 
 	var userInfoResp googleUserInfoAPIResponse
