@@ -61,7 +61,7 @@ func (dao *CosObjDAO) CreateDir(ctx context.Context, userID uint) (objectInfo *O
 		return
 	}
 
-	lastModified, _ := http.ParseTime(head.Header.Get("Last-Modified"))
+	lastModified, _ := http.ParseTime(head.Header.Get("Last-Modified")) //nolint:errcheck // header 可能缺失
 
 	objectInfo = &ObjectInfo{
 		ObjectName:   dirName,
@@ -130,14 +130,14 @@ func (dao *CosObjDAO) DownloadObject(ctx context.Context, userID uint, objectNam
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort close
 
 	head, err := dao.client.Object.Head(ctx, objectName, nil)
 	if err != nil {
 		return
 	}
 
-	lastModified, _ := http.ParseTime(head.Header.Get("Last-Modified"))
+	lastModified, _ := http.ParseTime(head.Header.Get("Last-Modified")) //nolint:errcheck // header 可能缺失
 
 	objectInfo = &ObjectInfo{
 		ObjectName:   objectName,

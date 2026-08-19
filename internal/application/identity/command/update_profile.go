@@ -4,6 +4,7 @@ package command
 import (
 	"context"
 
+	identityport "github.com/hcd233/aris-api-tmpl/internal/application/identity/port"
 	"github.com/hcd233/aris-api-tmpl/internal/common/ierr"
 	"github.com/hcd233/aris-api-tmpl/internal/domain/identity"
 	"github.com/hcd233/aris-api-tmpl/internal/domain/identity/vo"
@@ -11,30 +12,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// UpdateProfileCommand 更新用户资料命令。
-type UpdateProfileCommand struct {
-	UserID uint
-	Name   string
-	Email  string
-	Avatar string
-}
-
-// UpdateProfileHandler 更新资料命令处理器。
-type UpdateProfileHandler interface {
-	Handle(ctx context.Context, cmd UpdateProfileCommand) error
-}
-
 type updateProfileHandler struct {
 	repo identity.UserRepository
 }
 
 // NewUpdateProfileHandler 构造更新资料处理器。
-func NewUpdateProfileHandler(repo identity.UserRepository) UpdateProfileHandler {
+func NewUpdateProfileHandler(repo identity.UserRepository) identityport.UpdateProfileHandler {
 	return &updateProfileHandler{repo: repo}
 }
 
 // Handle 执行资料更新。
-func (h *updateProfileHandler) Handle(ctx context.Context, cmd UpdateProfileCommand) error {
+func (h *updateProfileHandler) Handle(ctx context.Context, cmd identityport.UpdateProfileCommand) error {
 	log := logger.WithCtx(ctx)
 	user, err := h.repo.FindByID(ctx, cmd.UserID)
 	if err != nil {

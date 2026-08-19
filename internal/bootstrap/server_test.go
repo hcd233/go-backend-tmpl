@@ -1,52 +1,49 @@
 package bootstrap
 
-import "testing"
+import (
+	"testing"
 
-func TestBuildServer(t *testing.T) {
-	t.Parallel()
+	"github.com/hcd233/aris-api-tmpl/internal/common/inflight"
+	"github.com/hcd233/aris-api-tmpl/internal/cron"
+	"github.com/hcd233/aris-api-tmpl/internal/infrastructure/pool"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/fx"
+	"gorm.io/gorm"
+)
 
-	server, err := BuildServer()
-	if err != nil {
-		t.Fatalf("BuildServer() error = %v", err)
+// buildTestApp 构造不依赖真实外部服务（DB/Redis）的 fx 应用，
+// 用于验证 DI 图完整性、中间件与路由装配。
+func buildTestApp(t *testing.T) *fx.App {
+	t.Helper()
+
+	customizers := []fx.Option{
+		fx.NopLogger,
+		fx.Replace(&gorm.DB{}),
+		fx.Replace(redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"})),
+		fx.Replace(pool.InitPoolManager()),
+		fx.Replace(cron.NewCronManager()),
+		fx.Replace(inflight.NewTracker()),
 	}
-	if server == nil {
-		t.Fatal("BuildServer() returned nil")
+
+	app := BuildFxApp("localhost", "0", customizers...)
+	if err := app.Err(); err != nil {
+		t.Fatalf("BuildFxApp() error = %v", err)
 	}
-	if server.App == nil {
-		t.Fatal("BuildServer().App returned nil")
-	}
-	if server.HumaAPI == nil {
-		t.Fatal("BuildServer().HumaAPI returned nil")
-	}
+	return app
 }
 
-func TestBuildServer_CreatesIsolatedApps(t *testing.T) {
+func TestBuildFxApp_GraphIsConstructible(t *testing.T) {
 	t.Parallel()
 
-	first, err := BuildServer()
-	if err != nil {
-		t.Fatalf("BuildServer() first error = %v", err)
-	}
-	second, err := BuildServer()
-	if err != nil {
-		t.Fatalf("BuildServer() second error = %v", err)
-	}
-	if first.App == second.App {
-		t.Fatal("BuildServer() reused Fiber app instance")
-	}
+	buildTestApp(t)
 }
 
-func TestRegisterRoutes(t *testing.T) {
+func TestBuildFxApp_CreatesIsolatedApps(t *testing.T) {
 	t.Parallel()
 
-	server, err := BuildServer()
-	if err != nil {
-		t.Fatalf("BuildServer() error = %v", err)
-	}
-	if err := RegisterRoutes(server); err != nil {
-		t.Fatalf("RegisterRoutes() error = %v", err)
-	}
-	if len(server.App.GetRoutes()) == 0 {
-		t.Fatal("RegisterRoutes() did not register any route")
+	first := buildTestApp(t)
+	second := buildTestApp(t)
+	if first == second {
+		t.Fatal("BuildFxApp() reused fx.App instance")
 	}
 }

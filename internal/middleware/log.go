@@ -93,32 +93,18 @@ func LogMiddleware(cfg LogMiddlewareConfig) fiber.Handler {
 			zap.String("latency", latency.String()),
 		}
 
+		fields = append(fields, buildRequestHeadersFields(c)...)
+		fields = append(fields, buildResponseHeadersFields(c)...)
+
 		if strings.Contains(string(c.Request().Header.ContentType()), "application/json") {
-			request := make(map[string]any)
-			if reqBody := c.Body(); reqBody != nil {
-				if err := sonic.Unmarshal(reqBody, &request); err != nil {
-					logger.Warn("[LogMiddleware] unmarshal request error", zap.ByteString("request", reqBody), zap.Error(err))
-				}
-			}
-			fields = append(fields, zap.Dict("request", lo.MapToSlice(request, func(key string, value any) zap.Field {
-				return zap.Any(key, value)
-			})...))
+			fields = append(fields, buildRequestBodyFields(c, logger)...)
 		}
 
 		// FIXME: get response body will break sse
 		// reference: https://github.com/gofiber/fiber/issues/429
 		// reference: https://github.com/samber/slog-fiber/issues/68
 		if strings.Contains(string(c.Response().Header.ContentType()), "application/json") { // response header content-type is not text/event-stream
-			response := make(map[string]any)
-			if respBody := c.Response().Body(); respBody != nil {
-				if err := sonic.Unmarshal(respBody, &response); err != nil {
-					logger.Warn("[LogMiddleware] unmarshal response error", zap.ByteString("response", respBody), zap.Error(err))
-				}
-			}
-			truncated := util.TruncateMapValues(response, constant.LogFieldValueMaxLength)
-			fields = append(fields, zap.Dict("response", lo.MapToSlice(truncated, func(key string, value any) zap.Field {
-				return zap.Any(key, value)
-			})...))
+			fields = append(fields, buildResponseBodyFields(c, logger)...)
 		}
 
 		if err != nil {
@@ -130,4 +116,73 @@ func LogMiddleware(cfg LogMiddlewareConfig) fiber.Handler {
 
 		return err
 	}
+}
+
+// buildRequestBodyFields 输出 JSON 请求体字段。
+func buildRequestBodyFields(c *fiber.Ctx, logger *zap.Logger) []zap.Field {
+	request := make(map[string]any)
+	if reqBody := c.Body(); reqBody != nil {
+		if err := sonic.Unmarshal(reqBody, &request); err != nil {
+			logger.Warn("[LogMiddleware] unmarshal request error", zap.ByteString("request", reqBody), zap.Error(err))
+		}
+	}
+	return []zap.Field{zap.Dict("request", lo.MapToSlice(request, func(key string, value any) zap.Field {
+		return zap.Any(key, value)
+	})...)}
+}
+
+// buildResponseBodyFields 输出 JSON 响应体字段（截断过长值）。
+func buildResponseBodyFields(c *fiber.Ctx, logger *zap.Logger) []zap.Field {
+	response := make(map[string]any)
+	if respBody := c.Response().Body(); respBody != nil {
+		if err := sonic.Unmarshal(respBody, &response); err != nil {
+			logger.Warn("[LogMiddleware] unmarshal response error", zap.ByteString("response", respBody), zap.Error(err))
+		}
+	}
+	truncated := util.TruncateMapValues(response, constant.LogFieldValueMaxLength)
+	return []zap.Field{zap.Dict("response", lo.MapToSlice(truncated, func(key string, value any) zap.Field {
+		return zap.Any(key, value)
+	})...)}
+}
+
+// sensitiveHeadersForLog 需要掩码的敏感头列表。
+var sensitiveHeadersForLog = []string{
+	constant.HTTPHeaderAuthorization,
+	constant.HTTPHeaderAPIKey,
+	constant.HTTPHeaderCookie,
+	constant.HTTPHeaderSetCookie,
+}
+
+func isSensitiveHeaderForLog(key string) bool {
+	return lo.ContainsBy(sensitiveHeadersForLog, func(h string) bool { return strings.EqualFold(key, h) })
+}
+
+// buildRequestHeadersFields 输出请求头，敏感头（Authorization/API Key/Cookie）掩码为占位符。
+func buildRequestHeadersFields(c *fiber.Ctx) []zap.Field {
+	reqHeaders := make(map[string]any, len(c.GetReqHeaders()))
+	for k, v := range c.GetReqHeaders() {
+		if isSensitiveHeaderForLog(k) {
+			reqHeaders[k] = constant.MaskSecretPlaceholder
+			continue
+		}
+		reqHeaders[k] = v
+	}
+	return []zap.Field{zap.Dict("request-headers", lo.MapToSlice(reqHeaders, func(key string, value any) zap.Field {
+		return zap.Any(key, value)
+	})...)}
+}
+
+// buildResponseHeadersFields 输出响应头，Set-Cookie 等敏感头掩码为占位符。
+func buildResponseHeadersFields(c *fiber.Ctx) []zap.Field {
+	respHeaders := make(map[string]any, len(c.GetRespHeaders()))
+	for k, v := range c.GetRespHeaders() {
+		if isSensitiveHeaderForLog(k) {
+			respHeaders[k] = constant.MaskSecretPlaceholder
+			continue
+		}
+		respHeaders[k] = v
+	}
+	return []zap.Field{zap.Dict("response-headers", lo.MapToSlice(respHeaders, func(key string, value any) zap.Field {
+		return zap.Any(key, value)
+	})...)}
 }

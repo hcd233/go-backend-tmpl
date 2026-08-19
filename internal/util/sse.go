@@ -48,7 +48,7 @@ func writeSSEErrorResponse(ctx context.Context, w *bufio.Writer, err *model.Erro
 		Status:   enum.SSEStatusError,
 		Data:     &dto.CommonRsp{Error: err},
 	}
-	fmt.Fprintf(w, "data: %s\n\n", lo.Must1(sonic.Marshal(rsp)))
+	fmt.Fprintf(w, "data: %s\n\n", lo.Must1(sonic.Marshal(rsp))) //nolint:errcheck // SSE 写入错误由 Flush 捕获
 	if err := w.Flush(); err != nil {
 		logger.Error("[WriteErrorResponse] flush error", zap.Error(err))
 	}

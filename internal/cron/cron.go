@@ -23,30 +23,17 @@ type Cron interface {
 	Stop()
 }
 
-var cronInstances []Cron
-
-// InitCronJobs 初始化定时任务
+// InitCronJobs 初始化定时任务并注册到管理器。
 //
+//	@param manager *CronManager 任务管理器（优雅退出时按 StopAll 停止）
 //	@author centonhuang
 //	@update 2026-03-23 10:00:00
-func InitCronJobs() {
+func InitCronJobs(manager *CronManager) {
 	exampleCron := NewExampleCron()
 	lo.Must0(exampleCron.Start())
-
-	cronInstances = append(cronInstances, exampleCron)
+	manager.Register(exampleCron)
 
 	logger.Logger().Info("[Cron] Init cron jobs")
-}
-
-// StopCronJobs 停止所有定时任务，用于优雅关闭
-//
-//	@author centonhuang
-//	@update 2026-03-23 10:00:00
-func StopCronJobs() {
-	for _, c := range cronInstances {
-		c.Stop()
-	}
-	logger.Logger().Info("[Cron] All cron jobs stopped")
 }
 
 type cronLoggerAdapter struct {
@@ -62,13 +49,13 @@ func newCronLoggerAdapter(module string, logger *zap.Logger) cronLoggerAdapter {
 	return cronLoggerAdapter{module: module, logger: logger}
 }
 
-func (l cronLoggerAdapter) Error(err error, msg string, keysAndValues ...interface{}) {
+func (l cronLoggerAdapter) Error(err error, msg string, keysAndValues ...any) {
 	zapKeyValues := []zap.Field{zap.Error(err)}
 	zapKeyValues = append(zapKeyValues, convertZapKeyValues(keysAndValues...)...)
 	l.logger.Error(fmt.Sprintf("[%s] %s", l.module, capitalizeFirst(msg)), zapKeyValues...)
 }
 
-func (l cronLoggerAdapter) Info(msg string, keysAndValues ...interface{}) {
+func (l cronLoggerAdapter) Info(msg string, keysAndValues ...any) {
 	zapKeyValues := convertZapKeyValues(keysAndValues...)
 	l.logger.Info(fmt.Sprintf("[%s] %s", l.module, capitalizeFirst(msg)), zapKeyValues...)
 }
@@ -83,13 +70,13 @@ func capitalizeFirst(s string) string {
 	return s
 }
 
-func convertZapKeyValues(keysAndValues ...interface{}) []zap.Field {
+func convertZapKeyValues(keysAndValues ...any) []zap.Field {
 	if len(keysAndValues)%2 != 0 {
 		panic("keysAndValues must be a slice of key-value pairs")
 	}
 	kvLen := len(keysAndValues) / 2
 	zapKeyValues := make([]zap.Field, 0, kvLen)
-	for i := 0; i < kvLen; i++ {
+	for i := range kvLen {
 		key, value := keysAndValues[i*2].(string), keysAndValues[i*2+1]
 		zapKeyValues = append(zapKeyValues, zap.Any(key, value))
 	}

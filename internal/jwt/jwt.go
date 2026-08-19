@@ -4,10 +4,11 @@
 package jwt
 
 import (
-	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/hcd233/aris-api-tmpl/internal/common/constant"
+	"github.com/hcd233/aris-api-tmpl/internal/common/ierr"
 )
 
 // Claims 鉴权结构体
@@ -46,10 +47,15 @@ func (s *tokenSigner) EncodeToken(userID uint) (token string, err error) {
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(s.JwtTokenExpired)),
+			Issuer:    constant.ProjectName,
+			Audience:  jwt.ClaimStrings{constant.ProjectName},
 		},
 	}
 
 	token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(s.JwtTokenSecret))
+	if err != nil {
+		return "", ierr.Wrap(ierr.ErrJWTEncode, err, "encode token")
+	}
 	return
 }
 
@@ -61,23 +67,23 @@ func (s *tokenSigner) EncodeToken(userID uint) (token string, err error) {
 //	author centonhuang
 //	update 2024-06-22 11:25:00
 func (s *tokenSigner) DecodeToken(tokenString string) (userID uint, err error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
+			return nil, ierr.New(ierr.ErrJWTDecode, "unexpected signing method")
 		}
 		return []byte(s.JwtTokenSecret), nil
-	})
+	},
+		jwt.WithIssuer(constant.ProjectName),
+		jwt.WithAudience(constant.ProjectName),
+	)
 	if err != nil {
-		return
+		return 0, ierr.Wrap(ierr.ErrJWTDecode, err, "parse token")
 	}
 
 	claims, ok := token.Claims.(*Claims)
-
 	if !ok || !token.Valid {
-		err = errors.New("token is invalid")
-		return
+		return 0, ierr.New(ierr.ErrJWTDecode, "token is invalid")
 	}
 
-	userID = claims.UserID
-	return
+	return claims.UserID, nil
 }

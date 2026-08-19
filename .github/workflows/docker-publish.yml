@@ -3,6 +3,7 @@ name: Docker-Publish
 on:
   schedule:
     - cron: '26 21 * * *'
+  workflow_dispatch:
   push:
     branches: ["master"]
     tags: ['v*.*.*']
@@ -28,6 +29,11 @@ on:
       - 'Makefile'
       - '.golangci.yml'
       - '.github/workflows/docker-publish.yml'
+
+# 同一分支/PR 的并发构建只保留最新一次，避免重复构建浪费
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -142,6 +148,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
+            type=raw,event=pr,value={{head_ref}}
             type=raw,value=${{ env.BRANCH_TAG }}
 
       - name: Build and push by digest

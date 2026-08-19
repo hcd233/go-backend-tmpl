@@ -1,10 +1,15 @@
 #!/bin/sh
-# Pre-commit hook: run Go checks before committing.
-set -eu
+# Pre-commit hook: run Go checks before committing
 
+# Path to the Go binary — override if Go is installed elsewhere, e.g. /usr/local/go/bin/go
 GO_BIN="${GO_BIN:-go}"
+
+# Allow Go to automatically download and switch to the toolchain version
+# required by go.mod (e.g. go 1.25.1 when the system only has 1.22.x)
 export GOTOOLCHAIN=auto
-export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin:$HOME/sdk/go/bin"
+
+# Ensure common Go install locations are in PATH
+export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin:$HOME/sdk/go/bin
 
 PASS="\033[32m[PASS]\033[0m"
 FAIL="\033[31m[FAIL]\033[0m"
@@ -15,40 +20,131 @@ fail() {
     exit 1
 }
 
-printf "$INFO Running gofmt on tracked Go files...\n"
-git ls-files '*.go' | while IFS= read -r file; do
-    if [ -n "$file" ]; then
-        gofmt -w "$file"
+# --------------------------------------------------------------------------
+# 0. agent instructions symlink sync — mirror AGENTS.md to CODEBUDDY.md / CLAUDE.md
+# --------------------------------------------------------------------------
+printf "$INFO Running agent instructions symlink sync ...\n"
+
+if [ -f script/sync-agent-instructions-symlinks.sh ]; then
+    chmod +x script/sync-agent-instructions-symlinks.sh 2>/dev/null || true
+    if ! sh script/sync-agent-instructions-symlinks.sh; then
+        fail "agent instructions symlink sync failed. Please fix the issues above before committing."
     fi
-done
-
-FORMATTED=$(git diff --name-only -- '*.go')
-if [ -n "$FORMATTED" ]; then
-    printf "$INFO gofmt reformatted files, staging changes:\n"
-    printf '%s\n' "$FORMATTED" | sed 's/^/       /'
-    printf '%s\n' "$FORMATTED" | xargs git add
+    # 仅当软链变更已被用户 staged 时才 re-add（避免污染分批提交）
+    AGENTS_LINK_STAGED=$(git diff --cached --name-only -- CODEBUDDY.md CLAUDE.md)
+    if [ -n "$AGENTS_LINK_STAGED" ]; then
+        AGENTS_LINK_CHANGES=$(git status --porcelain -- CODEBUDDY.md CLAUDE.md)
+        if [ -n "$AGENTS_LINK_CHANGES" ]; then
+            printf "$INFO agent instructions symlinks changed after sync (auto-staging):\n"
+            echo "$AGENTS_LINK_CHANGES" | sed 's/^/       /'
+            echo ""
+            git add CODEBUDDY.md CLAUDE.md
+        fi
+    fi
+else
+    printf "$INFO script/sync-agent-instructions-symlinks.sh not found — skipping\n"
 fi
-printf "$PASS gofmt\n"
+printf "$PASS agent instructions symlink sync\n"
 
-printf "$INFO Running go mod tidy...\n"
-$GO_BIN mod tidy
-if ! git diff --quiet -- go.mod go.sum; then
-    printf "$INFO go.mod or go.sum changed, staging changes:\n"
-    git diff --name-only -- go.mod go.sum | sed 's/^/       /'
-    git add go.mod go.sum
+# --------------------------------------------------------------------------
+# 0b. skills symlink sync — mirror .agents/skills into IDE skill directories
+# --------------------------------------------------------------------------
+printf "$INFO Running skills symlink sync ...\n"
+
+if [ -f script/sync-skills-symlinks.sh ]; then
+    chmod +x script/sync-skills-symlinks.sh 2>/dev/null || true
+    if ! sh script/sync-skills-symlinks.sh; then
+        fail "skills symlink sync failed. Please fix the issues above before committing."
+    fi
+    # 仅当 skills 软链已被用户 staged 时才 re-add（避免污染分批提交）
+    SKILLS_STAGED=$(git diff --cached --name-only -- .claude/skills .codebuddy/skills .zcode/skills)
+    if [ -n "$SKILLS_STAGED" ]; then
+        SKILLS_CHANGES=$(git status --porcelain -- .claude/skills .codebuddy/skills .zcode/skills)
+        if [ -n "$SKILLS_CHANGES" ]; then
+            printf "$INFO skills symlinks changed after sync (auto-staging):\n"
+            echo "$SKILLS_CHANGES" | sed 's/^/       /'
+            echo ""
+            git add .claude/skills .codebuddy/skills .zcode/skills
+        fi
+    fi
+else
+    printf "$INFO script/sync-skills-symlinks.sh not found — skipping\n"
 fi
-printf "$PASS go mod tidy\n"
+printf "$PASS skills symlink sync\n"
 
-printf "$INFO Running make lint...\n"
-if ! make lint; then
-    fail "make lint failed. Please fix the issues above before committing."
+# --------------------------------------------------------------------------
+# 1. Detect Go changes in staging area — skip Go checks if none
+# --------------------------------------------------------------------------
+GO_CHANGES=$(git diff --cached --name-only -- '*.go' 'go.mod' 'go.sum')
+
+if [ -z "$GO_CHANGES" ]; then
+    printf "$INFO No Go file changes in staging area — skipping gofmt, go mod tidy, vet, test, lint\n"
+else
+    # --------------------------------------------------------------------------
+    # 2. gofmt — auto-format staged Go files and re-stage them
+    # （只处理已 staged 的 .go 文件，不污染其他未 staged 的改动，支持分批提交）
+    # --------------------------------------------------------------------------
+    printf "$INFO Running gofmt -w on staged Go files...\n"
+    CACHED_GO=$(git diff --cached --name-only -- '*.go')
+
+    if [ -n "$CACHED_GO" ]; then
+        gofmt -w $CACHED_GO
+
+        if ! git diff --quiet -- $CACHED_GO; then
+            FORMATTED=$(git diff --name-only -- $CACHED_GO)
+            printf "$INFO gofmt reformatted the following files (auto-staging):\n"
+            echo "$FORMATTED" | sed 's/^/       /'
+            echo ""
+            git add $FORMATTED
+        fi
+    fi
+    printf "$PASS gofmt\n"
+
+    # --------------------------------------------------------------------------
+    # 3. go mod tidy — verify go.mod / go.sum are consistent and re-stage
+    # --------------------------------------------------------------------------
+    printf "$INFO Running go mod tidy...\n"
+    $GO_BIN mod tidy
+
+    if ! git diff --quiet go.mod go.sum; then
+        printf "$INFO go.mod or go.sum changed after 'go mod tidy' (auto-staging):\n"
+        git diff --name-only go.mod go.sum | sed 's/^/       /'
+        echo ""
+        git add go.mod go.sum
+    fi
+    printf "$PASS go mod tidy\n"
+
+    # --------------------------------------------------------------------------
+    # 4. go vet — static analysis
+    # --------------------------------------------------------------------------
+    printf "$INFO Running go vet ./...\n"
+
+    if ! $GO_BIN vet ./... 2>&1; then
+        fail "go vet failed. Please fix the issues above before committing."
+    fi
+    printf "$PASS go vet\n"
+
+    # --------------------------------------------------------------------------
+    # 5. go test — run all unit tests, block commit on any failure
+    # --------------------------------------------------------------------------
+    printf "$INFO Running go test -count=1 ./...\n"
+
+    if ! $GO_BIN test -count=1 ./... 2>&1; then
+        fail "go test failed. All tests must pass before committing."
+    fi
+    printf "$PASS go test\n"
+
+    # --------------------------------------------------------------------------
+    # 6. lint — project static analysis (go vet + golangci-lint)
+    # --------------------------------------------------------------------------
+    printf "$INFO Running lint...\n"
+
+    if ! $GO_BIN run main.go lint static ./... 2>&1; then
+        fail "lint failed. Please fix the issues above before committing."
+    fi
+    printf "$PASS lint\n"
 fi
-printf "$PASS make lint\n"
 
-printf "$INFO Running make test...\n"
-if ! make test; then
-    fail "make test failed. All tests must pass before committing."
-fi
-printf "$PASS make test\n"
-
-printf "\n$PASS All checks passed. Proceeding with commit.\n"
+# --------------------------------------------------------------------------
+echo ""
+printf "$PASS All checks passed. Proceeding with commit.\n"

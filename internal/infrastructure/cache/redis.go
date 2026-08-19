@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hcd233/aris-api-tmpl/internal/common/constant"
 	"github.com/hcd233/aris-api-tmpl/internal/config"
 	"github.com/hcd233/aris-api-tmpl/internal/logger"
 	"github.com/redis/go-redis/v9"
@@ -15,8 +16,6 @@ import (
 )
 
 var rdb *redis.Client
-
-const redisDB = 0
 
 // GetRedisClient 获取Redis客户端
 //
@@ -39,18 +38,20 @@ func CloseCache() error {
 	return rdb.Close()
 }
 
-// InitCache 初始化Redis客户端
+// InitCache 初始化Redis客户端并返回客户端实例（供依赖注入使用）。
 //
+//	@return *redis.Client
 //	author centonhuang
 //	update 2024-12-09 15:56:36
-func InitCache() {
+func InitCache() *redis.Client {
 	rdb = redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", config.RedisHost, config.RedisPort),
 		Password: config.RedisPassword,
-		DB:       redisDB,
+		DB:       constant.RedisDB,
 	})
 
 	_ = lo.Must1(rdb.Ping(context.Background()).Result())
 
-	logger.Logger().Info("[Cache] Connected to Redis database", zap.String("host", config.RedisHost), zap.String("port", config.RedisPort), zap.Int("db", redisDB))
+	logger.Logger().Info("[Cache] Connected to Redis database", zap.String("host", config.RedisHost), zap.String("port", config.RedisPort), zap.Int("db", constant.RedisDB))
+	return rdb
 }

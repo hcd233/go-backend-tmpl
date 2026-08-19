@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hcd233/aris-api-tmpl/internal/common/ierr"
 	"github.com/hcd233/aris-api-tmpl/internal/config"
 	"github.com/hcd233/aris-api-tmpl/internal/logger"
 	"go.uber.org/zap"
@@ -43,16 +44,17 @@ func CloseDatabase() error {
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
-		return fmt.Errorf("get underlying sql.DB: %w", err)
+		return ierr.Wrap(ierr.ErrDBClose, err, "get underlying sql.DB")
 	}
 	return sqlDB.Close()
 }
 
-// InitDatabase 初始化数据库
+// InitDatabase 初始化数据库并返回数据库实例（供依赖注入使用）。
 //
+//	@return *gorm.DB
 //	author centonhuang
 //	update 2024-09-22 10:04:36
-func InitDatabase() {
+func InitDatabase() *gorm.DB {
 	var dialector gorm.Dialector
 	var dbHost, dbPort, dbName string
 
@@ -88,6 +90,7 @@ func InitDatabase() {
 		zap.String("host", dbHost),
 		zap.String("port", dbPort),
 		zap.String("database", dbName))
+	return db
 }
 
 // GormLoggerAdapter 实现gorm的logger接口,使用zap输出SQL日志
@@ -119,7 +122,7 @@ func (l *GormLoggerAdapter) LogMode(level gormlogger.LogLevel) gormlogger.Interf
 //	param data ...interface{}
 //	author centonhuang
 //	update 2025-01-05 21:11:07
-func (l *GormLoggerAdapter) Info(ctx context.Context, msg string, data ...interface{}) {
+func (l *GormLoggerAdapter) Info(ctx context.Context, msg string, data ...any) {
 	logger.WithCtx(ctx).Info("[GORM] info", zap.String("msg", fmt.Sprintf(msg, data...)))
 }
 
@@ -131,7 +134,7 @@ func (l *GormLoggerAdapter) Info(ctx context.Context, msg string, data ...interf
 //	param data ...interface{}
 //	author centonhuang
 //	update 2025-01-05 21:11:08
-func (l *GormLoggerAdapter) Warn(ctx context.Context, msg string, data ...interface{}) {
+func (l *GormLoggerAdapter) Warn(ctx context.Context, msg string, data ...any) {
 	logger.WithCtx(ctx).Warn("[GORM] warn", zap.String("msg", fmt.Sprintf(msg, data...)))
 }
 
@@ -144,7 +147,7 @@ func (l *GormLoggerAdapter) Warn(ctx context.Context, msg string, data ...interf
 //	param data ...interface{}
 //	author centonhuang
 //	update 2025-01-05 21:11:10
-func (l *GormLoggerAdapter) Error(ctx context.Context, msg string, data ...interface{}) {
+func (l *GormLoggerAdapter) Error(ctx context.Context, msg string, data ...any) {
 	logger.WithCtx(ctx).Error("[GORM] error", zap.String("msg", fmt.Sprintf(msg, data...)))
 }
 

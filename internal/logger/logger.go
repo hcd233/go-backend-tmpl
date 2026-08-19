@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/hcd233/aris-api-tmpl/internal/common/constant"
 	"github.com/hcd233/aris-api-tmpl/internal/config"
+	"github.com/hcd233/aris-api-tmpl/internal/enum"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -60,17 +61,22 @@ func WithCtx(ctx context.Context) *zap.Logger {
 	logger := defaultLogger
 	if traceID := ctx.Value(constant.CtxKeyTraceID); traceID != nil {
 		if value, ok := traceID.(string); ok {
-			logger = logger.With(zap.String(constant.CtxKeyTraceID, value))
+			logger = logger.With(zap.String(string(constant.CtxKeyTraceID), value))
 		}
 	}
 	if userID := ctx.Value(constant.CtxKeyUserID); userID != nil {
 		if value, ok := userID.(uint); ok {
-			logger = logger.With(zap.Uint(constant.CtxKeyUserID, value))
+			logger = logger.With(zap.Uint(string(constant.CtxKeyUserID), value))
 		}
 	}
 	if userName := ctx.Value(constant.CtxKeyUserName); userName != nil {
 		if value, ok := userName.(string); ok {
-			logger = logger.With(zap.String(constant.CtxKeyUserName, value))
+			logger = logger.With(zap.String(string(constant.CtxKeyUserName), value))
+		}
+	}
+	if locale := ctx.Value(constant.CtxKeyLocale); locale != nil {
+		if value, ok := locale.(enum.Locale); ok {
+			logger = logger.With(zap.String(string(constant.CtxKeyLocale), string(value)))
 		}
 	}
 	return logger
@@ -86,17 +92,22 @@ func WithFCtx(c *fiber.Ctx) *zap.Logger {
 	logger := defaultLogger
 	if traceID := c.Locals(constant.CtxKeyTraceID); traceID != nil {
 		if value, ok := traceID.(string); ok {
-			logger = logger.With(zap.String(constant.CtxKeyTraceID, value))
+			logger = logger.With(zap.String(string(constant.CtxKeyTraceID), value))
 		}
 	}
 	if userID := c.Locals(constant.CtxKeyUserID); userID != nil {
 		if value, ok := userID.(uint); ok {
-			logger = logger.With(zap.Uint(constant.CtxKeyUserID, value))
+			logger = logger.With(zap.Uint(string(constant.CtxKeyUserID), value))
 		}
 	}
 	if userName := c.Locals(constant.CtxKeyUserName); userName != nil {
 		if value, ok := userName.(string); ok {
-			logger = logger.With(zap.String(constant.CtxKeyUserName, value))
+			logger = logger.With(zap.String(string(constant.CtxKeyUserName), value))
+		}
+	}
+	if locale := c.Locals(constant.CtxKeyLocale); locale != nil {
+		if value, ok := locale.(enum.Locale); ok {
+			logger = logger.With(zap.String(string(constant.CtxKeyLocale), string(value)))
 		}
 	}
 	return logger

@@ -18,6 +18,6 @@ type BaseModel struct {
 // Models undefined
 //
 //	update 2024-10-29 12:43:4
-var Models = []interface{}{
+var Models = []any{
 	&User{},
 }

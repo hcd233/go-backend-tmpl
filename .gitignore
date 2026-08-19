@@ -43,3 +43,25 @@ coverage.html
 
 # Worktrees
 .worktrees/
+# 二进制构建产物
+*.bin
+*.a
+*.lib
+*.obj
+*.o
+
+# 前端/工具缓存
+node_modules/
+__pycache__/
+
+# Agent 工具目录
+.superpowers/
+.omo/
+.pi/
+.pi-subagents/
+.understand-anything/
+.serena/
+.zcode/plans/
+
+# 本地部署密钥
+k8s/secret.yaml.local

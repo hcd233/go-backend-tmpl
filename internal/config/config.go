@@ -174,6 +174,10 @@ var (
 	// TrustedProxies []string 可信代理 IP 列表
 	//	@update 2026-04-13 15:00:00
 	TrustedProxies []string
+
+	// GuardAllowIPs []string 路由扫描防护白名单 IP 列表（逗号分隔）
+	//	@update 2026-08-19 10:00:00
+	GuardAllowIPs []string
 )
 
 func init() {
@@ -260,6 +264,7 @@ func initEnvironment() {
 
 	SQLBatchSize = config.GetInt("sql.batch.size")
 	TrustedProxies = parseTrustedProxies(config.GetString("trusted.proxies"))
+	GuardAllowIPs = parseTrustedProxies(config.GetString("guard.allow.ips"))
 }
 
 func parseTrustedProxies(raw string) []string {
